@@ -1,0 +1,201 @@
+name: kalshi-cli bottles
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "kalshi-cli version to package, e.g. 0.1.2 or v0.1.2. Empty uses latest release."
+        required: false
+        type: string
+      force:
+        description: "Rebuild bottles even when the formula already points at this version."
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "17 */6 * * *"
+
+concurrency:
+  group: kalshi-cli-bottles
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.update.outputs.changed }}
+      commit: ${{ steps.commit.outputs.commit }}
+      root_url: ${{ steps.update.outputs.root_url }}
+      version: ${{ steps.update.outputs.version }}
+    steps:
+      - name: Check out tap
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update formula
+        id: update
+        env:
+          FORCE: ${{ inputs.force || 'false' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || '' }}
+        run: ruby .github/scripts/update-kalshi-cli-formula.rb
+
+      - name: Commit formula update
+        id: commit
+        run: |
+          if [[ "${{ steps.update.outputs.changed }}" == "true" ]]; then
+            git add Formula/kalshi-cli.rb
+            git commit -m "build: update kalshi-cli to ${{ steps.update.outputs.version }}"
+            git push origin HEAD:main
+          fi
+
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-bottles:
+    needs: update-formula
+    if: needs.update-formula.outputs.changed == 'true' || inputs.force == true
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-26
+          - macos-15
+          - macos-14
+          - macos-26-intel
+          - macos-15-intel
+    runs-on: ${{ matrix.os }}
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out tap
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-formula.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+        with:
+          token: ${{ github.token }}
+
+      - name: Cache Homebrew Bundler RubyGems
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+          key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+          restore-keys: ${{ matrix.os }}-rubygems-
+
+      - run: brew test-bot --only-cleanup-before
+
+      - run: brew test-bot --only-setup
+
+      - run: brew test-bot --only-tap-syntax
+
+      - name: Build bottle
+        run: >
+          brew test-bot
+          --only-formulae
+          --root-url="${{ needs.update-formula.outputs.root_url }}"
+          --testing-formulae=kalshi-cli
+
+      - name: Upload bottle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottles-${{ matrix.os }}
+          path: "*.bottle.*"
+          if-no-files-found: error
+
+  publish-bottles:
+    needs:
+      - update-formula
+      - build-bottles
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out tap
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-formula.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+        with:
+          token: ${{ github.token }}
+
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bottles-*
+          path: dist
+          merge-multiple: true
+
+      - name: Prepare release assets
+        run: |
+          ruby <<'RUBY'
+          require "json"
+          require "fileutils"
+
+          Dir["dist/*.bottle.json"].each do |json_path|
+            data = JSON.parse(File.read(json_path))
+            data.each_value do |entry|
+              entry.fetch("bottle").fetch("tags").each_value do |tag|
+                local = File.join("dist", tag.fetch("local_filename"))
+                remote = File.join("dist", tag.fetch("filename"))
+                raise "missing bottle artifact #{local}" unless File.exist?(local)
+                FileUtils.cp(local, remote) unless local == remote
+                FileUtils.rm_f(local) unless local == remote
+              end
+            end
+          end
+          RUBY
+
+      - name: Upload bottles to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: kalshi-cli-${{ needs.update-formula.outputs.version }}
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" \
+              --title "kalshi-cli ${{ needs.update-formula.outputs.version }} bottles" \
+              --notes "Homebrew bottles for kalshi-cli ${{ needs.update-formula.outputs.version }}."
+
+          gh release upload "$RELEASE_TAG" --clobber dist/*.bottle.json
+          gh release upload "$RELEASE_TAG" --clobber dist/*-*.bottle*.tar.gz
+
+      - name: Merge bottle block
+        run: |
+          for json in dist/*.bottle.json; do
+            brew bottle --merge --write --no-commit "$json"
+          done
+
+      - name: Commit bottle block
+        run: |
+          git add Formula/kalshi-cli.rb
+          if git diff --cached --quiet; then
+            echo "Bottle block is already current."
+            exit 0
+          fi
+
+          git commit -m "ops: add kalshi-cli ${{ needs.update-formula.outputs.version }} bottles"
+          git push origin HEAD:main
