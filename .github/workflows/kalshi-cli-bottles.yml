@@ -32,7 +32,7 @@ jobs:
       version: ${{ steps.update.outputs.version }}
     steps:
       - name: Check out tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -80,7 +80,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Check out tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.update-formula.outputs.commit }}
           fetch-depth: 0
@@ -92,7 +92,7 @@ jobs:
           token: ${{ github.token }}
 
       - name: Cache Homebrew Bundler RubyGems
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.set-up-homebrew.outputs.gems-path }}
           key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
@@ -112,7 +112,7 @@ jobs:
           --testing-formulae=kalshi-cli
 
       - name: Upload bottle artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bottles-${{ matrix.os }}
           path: "*.bottle.*"
@@ -128,7 +128,7 @@ jobs:
       contents: write
     steps:
       - name: Check out tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.update-formula.outputs.commit }}
           fetch-depth: 0
@@ -144,7 +144,7 @@ jobs:
           token: ${{ github.token }}
 
       - name: Download bottle artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: bottles-*
           path: dist
