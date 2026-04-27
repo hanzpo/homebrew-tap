@@ -80,6 +80,15 @@ updated = formula
   .gsub(/\n  bottle do\n(?:    .*\n)+  end\n/, "\n")
 
 if updated == formula
+  if FORCE
+    write_output(
+      "changed" => "false",
+      "sha256" => sha256,
+    )
+    puts "kalshi-cli formula is already prepared for #{version}; rebuilding bottles."
+    exit 0
+  end
+
   raise "formula did not change; check #{FORMULA}"
 end
 
