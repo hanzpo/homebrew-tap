@@ -89,6 +89,9 @@ jobs:
         with:
           token: ${{ github.token }}
 
+      - name: Restore formula update
+        run: git checkout --force "${{ needs.update-formula.outputs.commit }}"
+
       - name: Cache Homebrew Bundler RubyGems
         uses: actions/cache@v5
         with:
@@ -140,6 +143,9 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@main
         with:
           token: ${{ github.token }}
+
+      - name: Restore formula update
+        run: git checkout --force "${{ needs.update-formula.outputs.commit }}"
 
       - name: Download bottle artifacts
         uses: actions/download-artifact@v8

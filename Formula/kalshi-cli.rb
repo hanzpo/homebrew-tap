@@ -5,7 +5,6 @@ class KalshiCli < Formula
   sha256 "619b4e079258160ac5b03e057ef8ab0cebed1e810c690731ad58a6c4571e889c"
   license "MIT"
 
-
   depends_on "rust" => :build
 
   def install
