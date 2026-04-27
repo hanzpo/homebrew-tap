@@ -6,7 +6,7 @@ Homebrew tap for hanzpo tools.
 
 The `kalshi-cli bottles` workflow keeps `Formula/kalshi-cli.rb` in sync with
 the latest `hanzpo/kalshi-cli` GitHub release and builds bottles on the
-GitHub-hosted macOS runners available to this repository.
+GitHub-hosted Apple Silicon macOS runners available to this repository.
 
 Normal release flow:
 
@@ -18,3 +18,8 @@ Normal release flow:
    pushes the tap commits.
 
 Use the `force` input to rebuild bottles for the formula's current version.
+
+Intel macOS bottles are not part of the default matrix because GitHub's Intel
+macOS runners currently report unbottled build dependencies for this Rust
+formula. Add a self-hosted Intel runner or accept source fallback for Intel
+users.
