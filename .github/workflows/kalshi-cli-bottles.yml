@@ -182,10 +182,7 @@ jobs:
           gh release upload "$RELEASE_TAG" --clobber dist/*-*.bottle*.tar.gz
 
       - name: Merge bottle block
-        run: |
-          for json in dist/*.bottle.json; do
-            brew bottle --merge --write --no-commit "$json"
-          done
+        run: brew bottle --merge --write --no-commit dist/*.bottle.json
 
       - name: Commit bottle block
         run: |
