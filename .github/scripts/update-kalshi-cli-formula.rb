@@ -77,7 +77,7 @@ updated = formula
   .sub(%r{url "https://github\.com/#{Regexp.escape(REPO)}/archive/refs/tags/v?[^/]+\.tar\.gz"},
        %(url "#{source_url}"))
   .sub(/sha256 "[0-9a-f]{64}"/, %(sha256 "#{sha256}"))
-  .gsub(/\n  bottle do\n(?:    .*\n)+  end\n/, "\n")
+  .gsub(/\n  bottle do\n(?:    .*\n)+  end\n+/, "\n\n")
 
 if updated == formula
   if FORCE
