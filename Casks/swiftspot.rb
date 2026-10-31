@@ -1,6 +1,6 @@
 cask "swiftspot" do
-  version "1.0.0"
-  sha256 "dcba28a5da12f499c5fae3fd980b4bc94b390ab96a3cb0877b5fbaeef90fc59d"
+  version "1.0.1"
+  sha256 "a1f78712f83919b3ff8feec7b4aaa6ece22aec75edd639cf6ee1064fc766a7bc"
 
   url "https://github.com/hanzpo/swiftspot/releases/download/v#{version}/SwiftSpot-#{version}.zip"
   name "SwiftSpot"
